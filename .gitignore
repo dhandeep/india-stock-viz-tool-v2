@@ -1,0 +1,8 @@
+__pycache__/
+.pytest_cache/
+node_modules/
+
+# Never commit real broker exports. Only the synthetic samples are tracked.
+*.csv
+*.xlsx
+!web/sample/*.csv

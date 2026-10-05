@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FIFO Lot Ledger</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top" id="hdr">
+  <h1>FIFO lot ledger <small>for ICICI Direct equity exports</small></h1>
+  <div class="controls">
+    <label class="file-btn" title="Required. ICICI Direct › Portfolio › Equity › All Transactions › CSV">
+      Transactions CSV <input type="file" data-kind="txn" accept=".csv,text/csv">
+    </label>
+    <span class="file-name" data-name="txn">required</span>
+    <label class="file-btn" title="Optional. CSV with ISIN Code, Qty, Value At Cost, Realized Profit / Loss">
+      Holdings CSV <input type="file" data-kind="hold" accept=".csv,text/csv">
+    </label>
+    <span class="file-name" data-name="hold">optional</span>
+    <label>As of <input type="date" class="asof"></label>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs" role="tablist" hidden>
+  <button role="tab" data-tab="overview">Overview</button>
+  <button role="tab" data-tab="summary">Summary<span class="count" data-count="summary"></span></button>
+  <button role="tab" data-tab="ledger">Lot Ledger<span class="count" data-count="ledger"></span></button>
+  <button role="tab" data-tab="open">Open Lots<span class="count" data-count="open"></span></button>
+  <button role="tab" data-tab="matches">Sell Matches<span class="count" data-count="matches"></span></button>
+  <button role="tab" data-tab="flags">Flags<span class="count" data-count="flags"></span></button>
+  <button role="tab" data-tab="about">About</button>
+  <button role="tab" data-tab="files">Files</button>
+</nav>
+
+<main>
+  <div id="messages"></div>
+
+  <section class="panel setup" id="panel-files">
+    <h2>Load your ICICI Direct files</h2>
+    <p class="privacy-note"><b>Your files stay on this computer.</b> They are read inside this browser tab.
+      Nothing is uploaded, and this page makes no network requests.</p>
+
+    <ol class="steps">
+      <li class="step" data-step="txn">
+        <div class="step-head">
+          <h3>1. Transactions CSV</h3><span class="badge req">Required</span>
+          <span class="status" data-status="txn">Not loaded</span>
+        </div>
+        <p>In ICICI Direct, go to <b>Portfolio › Equity › All Transactions</b>, set the date range to start
+          <b>before your first ever trade</b>, and download it as CSV. Use the file as downloaded, without editing it.</p>
+        <details>
+          <summary>Columns this file must have</summary>
+          <p><code>Stock Symbol</code>, <code>Company Name</code>, <code>ISIN Code</code>, <code>Action</code> (Buy / Sell),
+            <code>Quantity</code>, <code>Transaction Price</code>, <code>Transaction Date</code> (e.g. 22-Jul-2013).<br>
+            Used when present: <code>Brokerage</code>, <code>Transaction Charges</code>, <code>StampDuty</code> (added to cost),
+            <code>Remarks</code> (marks bonus, demerger and reconciliation lots).</p>
+          <p>A missing early history shows up as an error ("sell exceeds open quantity"), never as a silently wrong ledger.</p>
+        </details>
+        <label class="file-btn primary">Choose transactions CSV <input type="file" data-kind="txn" accept=".csv,text/csv"></label>
+      </li>
+
+      <li class="step" data-step="hold">
+        <div class="step-head">
+          <h3>2. Holdings CSV</h3><span class="badge">Optional</span>
+          <span class="status" data-status="hold">Not loaded</span>
+        </div>
+        <p>Lets the app check its results against ICICI's own figures: quantity, value at cost and realised P&amp;L per stock.
+          Make it from ICICI Direct's <b>Portfolio › Equity</b> holdings page, one row per stock, with exactly these columns:</p>
+        <p><code>ISIN Code</code>, <code>Qty</code>, <code>Value At Cost</code>, <code>Realized Profit / Loss</code>
+          <span class="hint">(numbers may contain commas; losses as -123 or (123))</span></p>
+        <div class="row-btns">
+          <label class="file-btn">Choose holdings CSV <input type="file" data-kind="hold" accept=".csv,text/csv"></label>
+          <button class="btn" type="button" id="templateBtn">Download blank template</button>
+        </div>
+      </li>
+
+      <li class="step">
+        <div class="step-head"><h3>3. As-of date</h3></div>
+        <p>The date used to measure holding periods (long-term means held more than 12 months). Defaults to today.</p>
+        <label class="asof-row">As of <input type="date" class="asof"></label>
+      </li>
+    </ol>
+
+    <div class="setup-foot">
+      <button class="btn primary" type="button" id="viewBtn" hidden>View results →</button>
+      <span>You can also drop both files anywhere on this page; the holdings file is recognised by its header.</span>
+      <span>Just looking? <button class="link" type="button" id="sampleLink">Load synthetic sample data</button></span>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-overview" hidden></section>
+  <section class="panel" id="panel-summary" hidden></section>
+  <section class="panel" id="panel-ledger" hidden></section>
+  <section class="panel" id="panel-open" hidden></section>
+  <section class="panel" id="panel-matches" hidden></section>
+  <section class="panel" id="panel-flags" hidden></section>
+  <section class="panel" id="panel-about" hidden></section>
+</main>
+<div class="tip" id="tip"></div>
+
+<script src="lotfifo.js"></script>
+<script src="sample/sample_data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
