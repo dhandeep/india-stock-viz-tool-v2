@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>FIFO Lot Ledger</title>
+<meta name="description" content="FIFO cost-basis ledger for ICICI Direct equity exports. Your files are read on your device and never uploaded.">
+<meta name="theme-color" content="#2a78d6">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Lot Ledger">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,6 +27,7 @@
     </label>
     <span class="file-name" data-name="hold">optional</span>
     <label>As of <input type="date" class="asof"></label>
+    <button class="btn primary" type="button" id="installBtn" hidden title="Install as an app on this device; it then works offline">Install app</button>
   </div>
 </header>
 

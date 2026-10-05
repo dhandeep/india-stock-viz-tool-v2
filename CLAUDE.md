@@ -11,6 +11,9 @@ be kept for tax filing and entered at the new broker.
 - web/index.html     browser app: choose the CSVs, see Summary / Lot Ledger / Open Lots / Sell Matches / Flags + charts.
                      Open from disk; files are read locally, no network.
 - web/lotfifo.js     JS port of fifo_lots.py (browser + Node). web/app.js = UI, web/dump_cli.js = JSON dump for tests
+- web/manifest.webmanifest, web/sw.js, web/icons/   installable PWA: offline app-shell cache (bump VERSION in
+                     sw.js when the file list changes; user CSVs are never fetched or cached)
+- index.html, .nojekyll   GitHub Pages root: redirects to web/ (site: dhandeep.github.io/india-stock-viz-tool-v2/)
 - web/sample/        SYNTHETIC sample CSVs (fake companies/ISINs) + sample_data.js (same data embedded for file:// use)
 - test_fifo_lots.py  engine tests (incl. independent per-share reference impl + random invariant tests)
 - test_js_parity.py  JS engine must match the Python engine exactly (needs node; skipped otherwise)

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#2a78d6"/>
+  <!-- three stacked lots, oldest (bottom) consumed first -->
+  <rect x="112" y="318" width="288" height="66" rx="14" fill="#ffffff" opacity="0.45"/>
+  <rect x="112" y="226" width="288" height="66" rx="14" fill="#ffffff" opacity="0.75"/>
+  <rect x="112" y="134" width="288" height="66" rx="14" fill="#ffffff"/>
+</svg>

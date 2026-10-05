@@ -7,7 +7,13 @@ Useful when moving shares to another broker, which typically shows transferred s
 
 ## Use it
 
-1. Download or clone this repo and open **`web/index.html`** in a browser (double-click is fine; no server, no install).
+**Online:** https://dhandeep.github.io/india-stock-viz-tool-v2/ (use *Install app*, or the browser's install /
+"Add to Home Screen" option, to keep it as an app; once opened it also works offline. Installed on desktop
+Chrome/Edge, it can open `.csv` files directly via "Open with").
+
+**From a download:** clone or download this repo and open `web/index.html` (double-click is fine).
+
+1. Open the app.
 2. Choose your files (they are read inside the browser tab and never uploaded anywhere):
 
 | File | Required | Where to get it | Columns used |

@@ -669,6 +669,28 @@
     // charts are drawn at the container's pixel width so text stays 11px; redraw when it changes
     resizeTimer = setTimeout(() => { if (S.res && S.tab === "overview" && window.innerWidth !== lastW) { lastW = window.innerWidth; render(); } }, 150);
   });
+  // ------------------------------------------------------ installable app
+  // Offline cache + install prompt only when served over http(s); opening the file from disk still works.
+  if ("serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register("sw.js").catch(e => console.warn("service worker not registered:", e));
+  }
+  let installEvt = null;
+  window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); installEvt = e; $("#installBtn").hidden = false; });
+  $("#installBtn").addEventListener("click", async () => {
+    if (!installEvt) return;
+    installEvt.prompt();
+    await installEvt.userChoice;
+    installEvt = null; $("#installBtn").hidden = true;
+  });
+  window.addEventListener("appinstalled", () => { $("#installBtn").hidden = true; });
+  // Installed app opened with CSV files from the OS ("Open with"): load them like dropped files.
+  if ("launchQueue" in window) {
+    window.launchQueue.setConsumer(async params => {
+      if (!params.files || !params.files.length) return;
+      loadFiles(await Promise.all(params.files.map(h => h.getFile())));
+    });
+  }
+
   updateFileStatus();
   render();
 })();
