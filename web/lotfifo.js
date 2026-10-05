@@ -274,6 +274,33 @@
     });
   }
 
+  /**
+   * Open lots as buy-average entries for a new broker: one per (ISIN, buy date).
+   * Brokers such as Zerodha accept one entry per ISIN per date, so open lots bought on the same
+   * date are merged: qty = sum of remaining qty, price = weighted average of the per-share price
+   * (cost incl. charges, or the trade price alone). Bonus lots keep price 0.
+   */
+  function migrationEntries(res, includeCharges = true) {
+    const groups = new Map();
+    for (const l of res.lots) {
+      if (l.qty_remaining === 0) continue;
+      const key = l.isin + "|" + l.buy_date;
+      let g = groups.get(key);
+      if (!g) {
+        g = { isin: l.isin, symbol: l.symbol, name: l.name, date: l.buy_date, qty: 0, value: 0, lot_ids: [], kinds: [] };
+        groups.set(key, g);
+      }
+      const unit = includeCharges ? l.cost_per_share : l.price;
+      g.qty += l.qty_remaining;
+      g.value += l.qty_remaining * unit;
+      g.lot_ids.push(l.lot_id);
+      if (l.kind !== "BUY" && !g.kinds.includes(l.kind)) g.kinds.push(l.kind);
+    }
+    const out = [...groups.values()].sort((a, b) => cmp(a.symbol, b.symbol) || cmp(a.isin, b.isin) || (a.date - b.date));
+    for (const g of out) g.price = g.value / g.qty;
+    return out;
+  }
+
   /** Python round(x, 2): toFixed rounds the exact binary value, as Python does (ties are practically never exact). */
   const round2 = x => Number(x.toFixed(2));
 
@@ -310,7 +337,7 @@
   }
 
   return {
-    FifoError, GRANDFATHER_CUTOFF, parseCSV, parseIciciCsv, runFifo, summarize, reconcile,
+    FifoError, GRANDFATHER_CUTOFF, parseCSV, parseIciciCsv, runFifo, summarize, reconcile, migrationEntries,
     isLongTerm, classifyKind, addMonths, dayNum, ymd, fmtDate, isoDate, parseISODate,
     parseIciciDate, today,
   };

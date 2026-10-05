@@ -54,6 +54,12 @@ def check_same(py_res, js):
         assert (m.lot_id, m.sell_row, m.qty, m.term, m.pre_2018, m.holding_days) == \
                (j["lot_id"], j["sell_row"], j["qty"], j["term"], j["pre_2018"], j["holding_days"])
         assert (m.proceeds, m.cost, m.pnl) == (j["proceeds"], j["cost"], j["pnl"])
+    for key, inc in (("migration", True), ("migration_trade_price", False)):
+        py_m = F.migration_entries(py_res, include_charges=inc)
+        assert len(py_m) == len(js[key])
+        for e, j in zip(py_m, js[key]):
+            assert e["date"] == ordinal(j["date"])
+            assert {k: v for k, v in e.items() if k != "date"} == {k: v for k, v in j.items() if k != "date"}
     for s, j in zip(F.summarize(py_res), js["summary"]):
         for k, v in s.items():
             if k == "earliest_open":

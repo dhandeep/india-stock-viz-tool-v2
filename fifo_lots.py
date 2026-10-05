@@ -261,6 +261,34 @@ def summarize(res: Result) -> list[dict]:
     return rows
 
 
+def migration_entries(res: Result, include_charges: bool = True) -> list[dict]:
+    """Open lots as buy-average entries for a new broker: one per (ISIN, buy date).
+
+    Brokers such as Zerodha accept one entry per ISIN per date, so open lots bought on the
+    same date are merged: qty = sum of remaining qty, price = weighted average of the per-share
+    price (cost incl. charges, or the trade price alone). Bonus lots keep price 0.
+    """
+    groups: dict = {}
+    for l in res.lots:
+        if l.qty_remaining == 0:
+            continue
+        g = groups.get((l.isin, l.buy_date))
+        if g is None:
+            g = groups[(l.isin, l.buy_date)] = dict(isin=l.isin, symbol=l.symbol, name=l.name,
+                                                    date=l.buy_date, qty=0, value=0.0,
+                                                    lot_ids=[], kinds=[])
+        unit = l.cost_per_share if include_charges else l.price
+        g["qty"] += l.qty_remaining
+        g["value"] += l.qty_remaining * unit
+        g["lot_ids"].append(l.lot_id)
+        if l.kind != "BUY" and l.kind not in g["kinds"]:
+            g["kinds"].append(l.kind)
+    out = sorted(groups.values(), key=lambda g: (g["symbol"], g["isin"], g["date"]))
+    for g in out:
+        g["price"] = g["value"] / g["qty"]
+    return out
+
+
 def reconcile(res: Result, holdings_csv: str, tol_cost: float = 1.0) -> list[dict]:
     """Compare against ICICI's portfolio export (Qty / Value At Cost / Realized)."""
     with open(holdings_csv, newline="", encoding="utf-8-sig") as f:

@@ -22,7 +22,11 @@ Chrome/Edge, it can open `.csv` files directly via "Open with").
 | Holdings CSV | no, for reconciliation | ICICI Direct › Portfolio › Equity (holdings) › download CSV (or fill the app's blank template) | `ISIN Code, Qty, Value At Cost, Realized Profit / Loss`; other columns ignored |
 
 3. Set the **As of** date (defaults to today) and read the tabs: Overview, Summary, Lot Ledger, Open Lots,
-   Sell Matches, Flags. Every table sorts, filters and downloads as CSV.
+   Sell Matches, Flags, Migrate. Every table sorts, filters and downloads as CSV.
+4. **Migrate** lists what to enter at the new broker (e.g. Zerodha Console's buy-average update for transferred
+   holdings): one entry per stock per buy date with quantity and price (cost incl. charges, or trade price only).
+   Open lots bought on the same date are merged at their weighted average, since brokers accept one entry per date;
+   lots from different dates are never merged, so holding periods (long/short term) stay exact.
 
 "Load sample data" uses synthetic data from `web/sample/` (fake companies and ISINs).
 

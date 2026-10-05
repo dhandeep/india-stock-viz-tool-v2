@@ -7,8 +7,8 @@ lot-level cost basis (with acquisition dates) from ICICI's transaction history u
 be kept for tax filing and entered at the new broker.
 
 ## Layout
-- fifo_lots.py       engine: parse_icici_csv, run_fifo, summarize, reconcile (stdlib + python-dateutil)
-- web/index.html     browser app: choose the CSVs, see Summary / Lot Ledger / Open Lots / Sell Matches / Flags + charts.
+- fifo_lots.py       engine: parse_icici_csv, run_fifo, summarize, reconcile, migration_entries (stdlib + python-dateutil)
+- web/index.html     browser app: choose the CSVs, see Summary / Lot Ledger / Open Lots / Sell Matches / Flags / Migrate + charts.
                      Open from disk; files are read locally, no network.
 - web/lotfifo.js     JS port of fifo_lots.py (browser + Node). web/app.js = UI, web/dump_cli.js = JSON dump for tests
 - web/manifest.webmanifest, web/sw.js, web/icons/   installable PWA: offline app-shell cache (bump VERSION in
@@ -42,4 +42,6 @@ reads paths from LOTFIFO_TXN / LOTFIFO_HOLDINGS.
   from corporate-action records (cost apportionment ratio; parent's purchase date). Shown on Flags.
 - Bonus/free lots use the allotment date in the file; verify against corporate actions.
 - Grandfathering needs FMV on 31-Jan-2018 per ISIN for pre-2018 lots; entered by the user on Summary.
+- Migration entries merge open lots per (ISIN, buy date) because brokers accept one entry per date; a bonus
+  and a paid buy on the same date therefore share an averaged price (flagged in the Migrate tab).
 - Splits/consolidations/mergers are not adjusted (quantity reconciliation is the check that none were missed).

@@ -7,7 +7,10 @@ const F = require("./lotfifo.js");
 const [txnPath, asOf, holdPath] = process.argv.slice(2);
 try {
   const res = F.runFifo(F.parseIciciCsv(fs.readFileSync(txnPath, "utf8")), F.parseISODate(asOf));
-  const out = { lots: res.lots, matches: res.matches, summary: F.summarize(res) };
+  const out = {
+    lots: res.lots, matches: res.matches, summary: F.summarize(res),
+    migration: F.migrationEntries(res), migration_trade_price: F.migrationEntries(res, false),
+  };
   if (holdPath) out.reconcile = F.reconcile(res, fs.readFileSync(holdPath, "utf8"));
   process.stdout.write(JSON.stringify(out));
 } catch (e) {

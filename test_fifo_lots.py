@@ -136,6 +136,38 @@ def test_summary_lt_st_split_uses_as_of_date():
     assert (s["qty_lt"], s["qty_st"]) == (15, 0)
 
 
+# ------------------------------------------------- broker migration entries
+def test_migration_merges_same_date_open_lots_at_weighted_average():
+    res = F.run_fifo([T(1, "Buy", 10, 100, D(2020, 1, 1), charges=10),       # cps 101
+                      T(2, "Buy", 30, 120, D(2020, 1, 1), charges=0),        # same date -> merged
+                      T(3, "Buy", 5, 0, D(2021, 1, 1), remarks="Bonus"),     # bonus: price 0
+                      T(4, "Buy", 8, 90, D(2022, 1, 1))])
+    e = F.migration_entries(res)
+    assert [(x["date"], x["qty"]) for x in e] == [(D(2020, 1, 1), 40), (D(2021, 1, 1), 5), (D(2022, 1, 1), 8)]
+    assert e[0]["price"] == pytest.approx((10 * 101 + 30 * 120) / 40)
+    assert e[1]["price"] == 0 and e[1]["kinds"] == ["BONUS_OR_FREE"]
+    assert F.migration_entries(res, include_charges=False)[0]["price"] == pytest.approx((10 * 100 + 30 * 120) / 40)
+
+
+def test_migration_uses_only_remaining_qty_and_skips_closed_lots():
+    res = F.run_fifo([T(1, "Buy", 10, 100, D(2020, 1, 1)), T(2, "Buy", 10, 200, D(2020, 6, 1)),
+                      T(3, "Sell", 15, 300, D(2021, 12, 1))])
+    (e,) = F.migration_entries(res)                     # lot 1 closed, lot 2 has 5 left
+    assert (e["date"], e["qty"], e["price"], e["lot_ids"]) == (D(2020, 6, 1), 5, 200, ["INE000A01010-002"])
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_migration_entries_add_up_to_holdings(seed):
+    txns = random_book(random.Random(seed))
+    res = F.run_fifo(txns, as_of=date(2026, 10, 5))
+    e = F.migration_entries(res)
+    assert len({(x["isin"], x["date"]) for x in e}) == len(e)          # one entry per ISIN per date
+    for s in F.summarize(res):
+        mine = [x for x in e if x["isin"] == s["isin"]]
+        assert sum(x["qty"] for x in mine) == s["qty_open"]
+        assert sum(x["value"] for x in mine) == pytest.approx(s["cost_open"])
+
+
 # -------------------- independent reference + randomised invariants (the key one)
 def reference_share_queue(txns):
     """Deliberately naive and structurally different: one list entry per SHARE,

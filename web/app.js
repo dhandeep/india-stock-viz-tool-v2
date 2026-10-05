@@ -47,7 +47,7 @@
   const S = {
     txnText: null, txnName: "", holdText: null, holdName: "",
     asOf: store.get("asOf", null), tab: store.get("tab", "overview"),
-    symbol: null, fmv: store.get("fmv", {}),
+    symbol: null, fmv: store.get("fmv", {}), migCharges: store.get("migCharges", true),
     res: null, summ: [], rec: null, recBy: new Map(), extraHoldings: [],
   };
 
@@ -211,14 +211,14 @@
 
     const counts = {
       summary: S.summ.length, ledger: S.res.lots.length, open: openLots().length,
-      matches: S.res.matches.length, flags: flagged().length,
+      matches: S.res.matches.length, flags: flagged().length, migrate: F.migrationEntries(S.res).length,
     };
     document.querySelectorAll("[data-count]").forEach(el => { el.textContent = counts[el.dataset.count]; });
     document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === S.tab));
     const panel = $("#panel-" + S.tab);
     panel.hidden = false;
     ({ overview: renderOverview, summary: renderSummary, ledger: renderLedger, open: renderOpen,
-      matches: renderMatches, flags: renderFlags, about: renderAbout })[S.tab](panel);
+      matches: renderMatches, flags: renderFlags, migrate: renderMigrate, about: renderAbout })[S.tab](panel);
   }
 
   function setTab(t) { S.tab = t; store.set("tab", t); render(); window.scrollTo(0, 0); }
@@ -452,6 +452,75 @@
     });
   }
 
+  // -------------------------------------------------------- Migrate
+  const MIG_CHECK = {
+    BONUS_OR_FREE: "Bonus/free: enter at price 0; confirm the allotment date against the corporate action.",
+    RECO: "ICICI placeholder lot: price/date may not be real. Find the true cost and date before entering.",
+    MIXED_BONUS: "Bonus and a purchase on the same date are combined (one entry per date); total cost is right, but the price is their average.",
+    DEMERGER: "Demerger: cost should be the apportioned cost and date the parent's purchase date. Verify first.",
+  };
+  const r2 = v => Math.round(v * 100) / 100;
+
+  function renderMigrate(el) {
+    const byId = new Map(S.res.lots.map(l => [l.lot_id, l]));
+    const rows = F.migrationEntries(S.res, S.migCharges).map(r => {
+      // a zero-cost bonus and a paid purchase on the same date must share one entry (one per date)
+      const ls = r.lot_ids.map(id => byId.get(id));
+      const mixed = ls.some(l => l.kind === "BONUS_OR_FREE") && ls.some(l => l.price > 0);
+      return mixed ? { ...r, kinds: [...r.kinds.filter(k => k !== "BONUS_OR_FREE"), "MIXED_BONUS"] } : r;
+    });
+    const needCheck = rows.filter(r => r.kinds.length);
+    const stocks = new Set(rows.map(r => r.isin)).size;
+    const qtyBad = S.rec ? S.rec.filter(r => r.note || !r.qty_ok) : [];
+    const roundDiff = sum(rows, r => r.qty * r2(r.price)) - sum(rows, r => r.value);
+    el.innerHTML = `
+      <div class="mig-intro">
+        <h3>Enter your cost basis at the new broker</h3>
+        <p>After a transfer, the new broker (e.g. Zerodha) shows the buy average of transferred shares as N/A, because only the
+          shares move, not their purchase details. Each row below is one entry to make there: <b>buy date, quantity, price</b>.</p>
+        <ol>
+          <li>In <b>Zerodha Console › Portfolio › Holdings</b>, open a stock with a missing buy average and choose to update it
+            (<a href="https://support.zerodha.com/category/console/portfolio/console-holdings/articles/multiple-trades-discrepant" target="_blank" rel="noopener noreferrer">Zerodha's guide</a>).</li>
+          <li>Add one entry per row for that stock. Lots bought on the same date are already merged, since Zerodha accepts one entry
+            per stock per date. Zerodha then works out the buy average with FIFO, the same method used here.</li>
+          <li>Entries cannot be edited once Zerodha has processed them, so <b>resolve every row marked “check” first</b>.</li>
+        </ol>
+        <div class="mig-opts" role="radiogroup" aria-label="Price to enter">
+          <span>Price to enter:</span>
+          <label><input type="radio" name="migp" value="1" ${S.migCharges ? "checked" : ""}> Cost incl. charges
+            <span class="hint">(price + brokerage, transaction charges, stamp duty; your tax cost)</span></label>
+          <label><input type="radio" name="migp" value="0" ${S.migCharges ? "" : "checked"}> Trade price only</label>
+        </div>
+        <div class="mig-stats">
+          <span><b>${qty(rows.length)}</b> entries for <b>${qty(stocks)}</b> stocks</span>
+          <span class="${needCheck.length ? "bad" : "ok"}">${needCheck.length ? `⚠ ${needCheck.length} need a check before entering` : "✓ no entries need a check"}</span>
+          ${S.rec ? `<span class="${qtyBad.length ? "bad" : "ok"}">${qtyBad.length ? `✗ ${qtyBad.length} stock(s) differ from ICICI's quantity` : "✓ quantities match ICICI"}</span>`
+            : `<span class="hint">load the holdings CSV to confirm quantities against ICICI</span>`}
+          <span class="hint">Prices rounded to 2 decimals: total effect ${rupee(roundDiff)}.</span>
+        </div>
+      </div>
+      <div id="mig-table"></div>`;
+    el.querySelectorAll('input[name="migp"]').forEach(inp => inp.addEventListener("change", () => {
+      S.migCharges = inp.value === "1"; store.set("migCharges", S.migCharges); render();
+    }));
+    const cols = [
+      symCol("migrate"), { key: "isin", label: "ISIN" }, { key: "name", label: "Company" }, D("date", "Buy date"),
+      Q("qty", "Quantity"),
+      { key: "price", label: "Price", num: true, val: r => r2(r.price), html: r => money(r2(r.price)) },
+      M("value", "Value"),
+      { key: "lots", label: "Lots merged", num: true, val: r => r.lot_ids.length, csv: r => r.lot_ids.join(" "),
+        title: "Open lots bought on this date, combined into one entry" },
+      { key: "check", label: "Check", cls: "wrap", val: r => r.kinds.map(k => MIG_CHECK[k]).join(" "),
+        html: r => r.kinds.length ? `<span class="bad">⚠</span> ${esc(r.kinds.map(k => MIG_CHECK[k]).join(" "))}` : "" },
+    ];
+    table($("#mig-table", el), cols, {
+      id: "migrate", rows, filename: S.migCharges ? "broker_entries_cost_incl_charges" : "broker_entries_trade_price",
+      symbolFilter: true, legend: "one row = one buy-average entry (date, quantity, price)",
+      rowClass: r => (r.kinds.length ? "partial" : ""),
+      foot: rs => ({ symbol: "TOTAL", qty: qty(sum(rs, r => r.qty)), value: money(sum(rs, r => r.value)) }),
+    });
+  }
+
   // ---------------------------------------------------------- About
   function renderAbout(el) {
     el.innerHTML = `<div class="about">
@@ -467,6 +536,7 @@
         <dt>Lot Ledger</dt><dd>Every purchase lot. Struck through = fully sold. Highlighted = partly sold (remaining qty shown). Plain = untouched.</dd>
         <dt>Open Lots</dt><dd>Only what you still hold, lot by lot: this is the cost-basis record to keep for your new broker and your tax filing.</dd>
         <dt>Sell Matches</dt><dd>Each sell row matched to the exact lots it consumed (oldest first), with cost, proceeds, P&amp;L and LT/ST.</dd>
+        <dt>Migrate</dt><dd>The open lots as entries for your new broker (buy date, quantity, price), one per stock per date, downloadable as CSV.</dd>
         <dt>Flags</dt><dd>Lots that are not ordinary purchases (reco placeholders, demergers, bonus/free) and need a human check.</dd>
       </dl>
       <h3>Conventions</h3>
