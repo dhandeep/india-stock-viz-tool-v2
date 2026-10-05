@@ -44,4 +44,7 @@ reads paths from LOTFIFO_TXN / LOTFIFO_HOLDINGS.
 - Grandfathering needs FMV on 31-Jan-2018 per ISIN for pre-2018 lots; entered by the user on Summary.
 - Migration entries merge open lots per (ISIN, buy date) because brokers accept one entry per date; a bonus
   and a paid buy on the same date therefore share an averaged price (flagged in the Migrate tab).
+  Condensed mode groups per ISIN into pre-2018 / later LT / ST (as of res.as_of), dated at the group's LATEST
+  buy date (never makes a share look older); RECO/DEMERGER lots stay separate. Partial future sales inside a
+  group are then costed at the group average instead of lot-exact FIFO.
 - Splits/consolidations/mergers are not adjusted (quantity reconciliation is the check that none were missed).

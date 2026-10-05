@@ -27,6 +27,9 @@ Chrome/Edge, it can open `.csv` files directly via "Open with").
    holdings): one entry per stock per buy date with quantity and price (cost incl. charges, or trade price only).
    Open lots bought on the same date are merged at their weighted average, since brokers accept one entry per date;
    lots from different dates are never merged, so holding periods (long/short term) stay exact.
+   **Condensed** cuts the rows to at most one per stock for each of: pre-2018 lots, later long-term lots,
+   short-term lots (each averaged and dated at the group's latest buy date, so grandfathering and long-term
+   status are preserved); reco/demerger lots stay separate. Zerodha has no bulk upload, so fewer rows means less typing.
 
 "Load sample data" uses synthetic data from `web/sample/` (fake companies and ISINs).
 

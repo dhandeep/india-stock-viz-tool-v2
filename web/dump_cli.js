@@ -10,6 +10,7 @@ try {
   const out = {
     lots: res.lots, matches: res.matches, summary: F.summarize(res),
     migration: F.migrationEntries(res), migration_trade_price: F.migrationEntries(res, false),
+    migration_condensed: F.migrationEntries(res, true, true),
   };
   if (holdPath) out.reconcile = F.reconcile(res, fs.readFileSync(holdPath, "utf8"));
   process.stdout.write(JSON.stringify(out));

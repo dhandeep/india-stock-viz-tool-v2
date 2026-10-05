@@ -47,7 +47,7 @@
   const S = {
     txnText: null, txnName: "", holdText: null, holdName: "",
     asOf: store.get("asOf", null), tab: store.get("tab", "overview"),
-    symbol: null, fmv: store.get("fmv", {}), migCharges: store.get("migCharges", true),
+    symbol: null, fmv: store.get("fmv", {}), migCharges: store.get("migCharges", true), migCondensed: store.get("migCondensed", false),
     res: null, summ: [], rec: null, recBy: new Map(), extraHoldings: [],
   };
 
@@ -211,7 +211,7 @@
 
     const counts = {
       summary: S.summ.length, ledger: S.res.lots.length, open: openLots().length,
-      matches: S.res.matches.length, flags: flagged().length, migrate: F.migrationEntries(S.res).length,
+      matches: S.res.matches.length, flags: flagged().length, migrate: F.migrationEntries(S.res, true, S.migCondensed).length,
     };
     document.querySelectorAll("[data-count]").forEach(el => { el.textContent = counts[el.dataset.count]; });
     document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === S.tab));
@@ -456,18 +456,29 @@
   const MIG_CHECK = {
     BONUS_OR_FREE: "Bonus/free: enter at price 0; confirm the allotment date against the corporate action.",
     RECO: "ICICI placeholder lot: price/date may not be real. Find the true cost and date before entering.",
+    DATE_CLASH: "Another entry for this stock has the same date, and the broker accepts one per date. Fix this lot's date (or merge) first.",
     MIXED_BONUS: "Bonus and a purchase on the same date are combined (one entry per date); total cost is right, but the price is their average.",
     DEMERGER: "Demerger: cost should be the apportioned cost and date the parent's purchase date. Verify first.",
   };
   const r2 = v => Math.round(v * 100) / 100;
+  const BUCKET = { pre2018: "Pre-2018", lt: "Long-term", st: "Short-term", lot: "Separate lot" };
 
   function renderMigrate(el) {
     const byId = new Map(S.res.lots.map(l => [l.lot_id, l]));
-    const rows = F.migrationEntries(S.res, S.migCharges).map(r => {
-      // a zero-cost bonus and a paid purchase on the same date must share one entry (one per date)
+    const nExact = F.migrationEntries(S.res).length, nCond = F.migrationEntries(S.res, true, true).length;
+    const raw = F.migrationEntries(S.res, S.migCharges, S.migCondensed);
+    const dateCount = new Map();
+    for (const r of raw) dateCount.set(r.isin + "|" + r.date, (dateCount.get(r.isin + "|" + r.date) || 0) + 1);
+    const rows = raw.map(r => {
+      let kinds = r.kinds;
+      // exact mode: a zero-cost bonus and a paid purchase on the same date must share one entry (one per date)
       const ls = r.lot_ids.map(id => byId.get(id));
-      const mixed = ls.some(l => l.kind === "BONUS_OR_FREE") && ls.some(l => l.price > 0);
-      return mixed ? { ...r, kinds: [...r.kinds.filter(k => k !== "BONUS_OR_FREE"), "MIXED_BONUS"] } : r;
+      if (!S.migCondensed && ls.some(l => l.kind === "BONUS_OR_FREE") && ls.some(l => l.price > 0))
+        kinds = [...kinds.filter(k => k !== "BONUS_OR_FREE"), "MIXED_BONUS"];
+      // condensed: a bonus inside a group with paid lots is just part of the average; a bonus-only group keeps its check
+      if (S.migCondensed && ls.some(l => l.price > 0)) kinds = kinds.filter(k => k !== "BONUS_OR_FREE");
+      if (dateCount.get(r.isin + "|" + r.date) > 1) kinds = [...kinds, "DATE_CLASH"];
+      return { ...r, kinds };
     });
     const needCheck = rows.filter(r => r.kinds.length);
     const stocks = new Set(rows.map(r => r.isin)).size;
@@ -491,6 +502,18 @@
             <span class="hint">(price + brokerage, transaction charges, stamp duty; your tax cost)</span></label>
           <label><input type="radio" name="migp" value="0" ${S.migCharges ? "" : "checked"}> Trade price only</label>
         </div>
+        <div class="mig-opts" role="radiogroup" aria-label="Rows">
+          <span>Rows:</span>
+          <label><input type="radio" name="migm" value="0" ${S.migCondensed ? "" : "checked"}> Exact, ${qty(nExact)} entries
+            <span class="hint">(one per buy date; FIFO-exact for future sales)</span></label>
+          <label><input type="radio" name="migm" value="1" ${S.migCondensed ? "checked" : ""}> Condensed, ${qty(nCond)} entries
+            <span class="hint">(per stock: pre-2018, later long-term, short-term)</span></label>
+        </div>
+        ${S.migCondensed ? `<p class="mig-note">Condensed averages lots within each group and dates the entry at the group's <b>latest</b> buy date,
+          so no share looks older than it is: pre-2018 shares stay before the 31-Jan-2018 grandfathering cutoff, and long-term shares stay
+          long-term. Total cost per stock is unchanged. Trade-offs: a later partial sale inside a group is costed at the group average rather
+          than lot by lot, and short-term shares turn long-term on the latest date's anniversary. The split uses the As-of date
+          (${date(asOf())}): set it to the day you make the entries. Reco and demerger lots stay as their own rows.</p>` : ""}
         <div class="mig-stats">
           <span><b>${qty(rows.length)}</b> entries for <b>${qty(stocks)}</b> stocks</span>
           <span class="${needCheck.length ? "bad" : "ok"}">${needCheck.length ? `⚠ ${needCheck.length} need a check before entering` : "✓ no entries need a check"}</span>
@@ -503,8 +526,13 @@
     el.querySelectorAll('input[name="migp"]').forEach(inp => inp.addEventListener("change", () => {
       S.migCharges = inp.value === "1"; store.set("migCharges", S.migCharges); render();
     }));
+    el.querySelectorAll('input[name="migm"]').forEach(inp => inp.addEventListener("change", () => {
+      S.migCondensed = inp.value === "1"; store.set("migCondensed", S.migCondensed); render();
+    }));
     const cols = [
       symCol("migrate"), { key: "isin", label: "ISIN" }, { key: "name", label: "Company" }, D("date", "Buy date"),
+      ...(S.migCondensed ? [{ key: "bucket", label: "Group", val: r => BUCKET[r.bucket],
+        html: r => `${esc(BUCKET[r.bucket])}${r.first_date !== r.date ? `<div class="hint">lots ${date(r.first_date)} – ${date(r.date)}</div>` : ""}` }] : []),
       Q("qty", "Quantity"),
       { key: "price", label: "Price", num: true, val: r => r2(r.price), html: r => money(r2(r.price)) },
       M("value", "Value"),
@@ -514,7 +542,8 @@
         html: r => r.kinds.length ? `<span class="bad">⚠</span> ${esc(r.kinds.map(k => MIG_CHECK[k]).join(" "))}` : "" },
     ];
     table($("#mig-table", el), cols, {
-      id: "migrate", rows, filename: S.migCharges ? "broker_entries_cost_incl_charges" : "broker_entries_trade_price",
+      id: "migrate", rows,
+      filename: `broker_entries_${S.migCondensed ? "condensed" : "exact"}_${S.migCharges ? "cost_incl_charges" : "trade_price"}`,
       symbolFilter: true, legend: "one row = one buy-average entry (date, quantity, price)",
       rowClass: r => (r.kinds.length ? "partial" : ""),
       foot: rs => ({ symbol: "TOTAL", qty: qty(sum(rs, r => r.qty)), value: money(sum(rs, r => r.value)) }),

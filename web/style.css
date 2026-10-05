@@ -200,6 +200,7 @@ td input.fmv { width: 100px; text-align: right; border: 1px solid var(--axis); b
 .mig-intro ol { margin: 6px 0; padding-left: 20px; }
 .mig-opts { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; margin: 10px 0 6px; }
 .mig-opts label { display: inline-flex; gap: 6px; align-items: baseline; cursor: pointer; }
+.mig-note { font-size: 13px; background: var(--surface-2); border-radius: 8px; padding: 8px 12px; margin: 6px 0 10px; }
 .mig-stats { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; }
 
 /* ----------------------------------------------------------------- about */

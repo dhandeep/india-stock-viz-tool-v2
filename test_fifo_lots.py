@@ -168,6 +168,36 @@ def test_migration_entries_add_up_to_holdings(seed):
         assert sum(x["value"] for x in mine) == pytest.approx(s["cost_open"])
 
 
+def test_condensed_migration_keeps_tax_buckets_apart():
+    ts = [T(1, "Buy", 10, 100, D(2015, 1, 1)), T(2, "Buy", 10, 200, D(2017, 6, 1)),    # pre-2018
+          T(3, "Buy", 5, 0, D(2017, 9, 1), remarks="Bonus"),                            # pre-2018 bonus
+          T(4, "Buy", 10, 300, D(2019, 1, 1)), T(5, "Buy", 10, 400, D(2020, 1, 1)),    # later long-term
+          T(6, "Buy", 4, 500, D(2026, 6, 1)),                                           # short-term
+          T(7, "Buy", 3, 1, D(2016, 3, 1), remarks="Added from reco"),                  # kept separate
+          T(8, "Sell", 5, 250, D(2018, 6, 1))]                                          # FIFO: from 2015 lot
+    e = F.migration_entries(F.run_fifo(ts, as_of=D(2026, 10, 5)), condensed=True)
+    got = [(x["bucket"], x["date"], x["qty"]) for x in e]
+    assert got == [("lot", D(2016, 3, 1), 3), ("pre2018", D(2017, 9, 1), 20),
+                   ("lt", D(2020, 1, 1), 20), ("st", D(2026, 6, 1), 4)]
+    pre = e[1]
+    assert pre["first_date"] == D(2015, 1, 1)
+    assert pre["price"] == pytest.approx((5 * 100 + 10 * 200 + 5 * 0) / 20)
+    assert pre["date"] <= F.GRANDFATHER_CUTOFF
+
+
+@pytest.mark.parametrize("seed", range(30))
+def test_condensed_migration_preserves_totals_and_boundaries(seed):
+    res = F.run_fifo(random_book(random.Random(seed)), as_of=date(2026, 10, 5))
+    exact, cond = F.migration_entries(res), F.migration_entries(res, condensed=True)
+    assert len(cond) <= len(exact)
+    for s in F.summarize(res):
+        mine = [x for x in cond if x["isin"] == s["isin"]]
+        assert sum(x["qty"] for x in mine) == s["qty_open"]
+        assert sum(x["value"] for x in mine) == pytest.approx(s["cost_open"])
+        assert sum(x["qty"] for x in mine if x["date"] <= F.GRANDFATHER_CUTOFF) == s["qty_pre2018"]
+        assert sum(x["qty"] for x in mine if F.is_long_term(x["date"], res.as_of)) == s["qty_lt"]
+
+
 # -------------------- independent reference + randomised invariants (the key one)
 def reference_share_queue(txns):
     """Deliberately naive and structurally different: one list entry per SHARE,

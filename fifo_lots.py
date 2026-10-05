@@ -261,29 +261,45 @@ def summarize(res: Result) -> list[dict]:
     return rows
 
 
-def migration_entries(res: Result, include_charges: bool = True) -> list[dict]:
-    """Open lots as buy-average entries for a new broker: one per (ISIN, buy date).
+def migration_entries(res: Result, include_charges: bool = True, condensed: bool = False) -> list[dict]:
+    """Open lots as buy-average entries for a new broker.
 
-    Brokers such as Zerodha accept one entry per ISIN per date, so open lots bought on the
-    same date are merged: qty = sum of remaining qty, price = weighted average of the per-share
-    price (cost incl. charges, or the trade price alone). Bonus lots keep price 0.
+    Brokers such as Zerodha accept one entry per ISIN per date, so open lots are merged:
+    qty = sum of remaining qty, price = weighted average of the per-share price (cost incl.
+    charges, or the trade price alone). Bonus lots keep price 0.
+
+    exact (default): one entry per (ISIN, buy date).
+    condensed: fewer entries without crossing a tax boundary. Per ISIN, one entry each for
+      pre-2018 lots (grandfathering), later long-term lots and short-term lots (as of res.as_of),
+      dated at the LATEST lot in the group, so no share appears older than it is and the groups
+      stay in FIFO order. RECO/DEMERGER lots stay separate (their cost/date need correcting).
     """
     groups: dict = {}
     for l in res.lots:
         if l.qty_remaining == 0:
             continue
-        g = groups.get((l.isin, l.buy_date))
+        if not condensed:
+            key, bucket = (l.isin, l.buy_date), None
+        elif l.kind in ("RECO", "DEMERGER"):
+            key, bucket = (l.isin, "lot", l.lot_id), "lot"
+        else:
+            bucket = ("pre2018" if l.buy_date <= GRANDFATHER_CUTOFF
+                      else "lt" if is_long_term(l.buy_date, res.as_of) else "st")
+            key = (l.isin, bucket)
+        g = groups.get(key)
         if g is None:
-            g = groups[(l.isin, l.buy_date)] = dict(isin=l.isin, symbol=l.symbol, name=l.name,
-                                                    date=l.buy_date, qty=0, value=0.0,
-                                                    lot_ids=[], kinds=[])
+            g = groups[key] = dict(isin=l.isin, symbol=l.symbol, name=l.name, bucket=bucket,
+                                   date=l.buy_date, first_date=l.buy_date, qty=0, value=0.0,
+                                   lot_ids=[], kinds=[])
         unit = l.cost_per_share if include_charges else l.price
         g["qty"] += l.qty_remaining
         g["value"] += l.qty_remaining * unit
+        g["date"] = max(g["date"], l.buy_date)
+        g["first_date"] = min(g["first_date"], l.buy_date)
         g["lot_ids"].append(l.lot_id)
         if l.kind != "BUY" and l.kind not in g["kinds"]:
             g["kinds"].append(l.kind)
-    out = sorted(groups.values(), key=lambda g: (g["symbol"], g["isin"], g["date"]))
+    out = sorted(groups.values(), key=lambda g: (g["symbol"], g["isin"], g["date"], g["lot_ids"][0]))
     for g in out:
         g["price"] = g["value"] / g["qty"]
     return out

@@ -275,28 +275,38 @@
   }
 
   /**
-   * Open lots as buy-average entries for a new broker: one per (ISIN, buy date).
-   * Brokers such as Zerodha accept one entry per ISIN per date, so open lots bought on the same
-   * date are merged: qty = sum of remaining qty, price = weighted average of the per-share price
-   * (cost incl. charges, or the trade price alone). Bonus lots keep price 0.
+   * Open lots as buy-average entries for a new broker (see migration_entries in fifo_lots.py).
+   * exact: one entry per (ISIN, buy date). condensed: per ISIN one entry each for pre-2018,
+   * later long-term and short-term lots (as of res.as_of), dated at the latest lot in the group;
+   * RECO/DEMERGER lots stay separate. Price = weighted average per-share price.
    */
-  function migrationEntries(res, includeCharges = true) {
+  function migrationEntries(res, includeCharges = true, condensed = false) {
     const groups = new Map();
     for (const l of res.lots) {
       if (l.qty_remaining === 0) continue;
-      const key = l.isin + "|" + l.buy_date;
+      let key, bucket;
+      if (!condensed) { key = l.isin + "|" + l.buy_date; bucket = null; }
+      else if (l.kind === "RECO" || l.kind === "DEMERGER") { key = l.isin + "|lot|" + l.lot_id; bucket = "lot"; }
+      else {
+        bucket = l.buy_date <= GRANDFATHER_CUTOFF ? "pre2018" : isLongTerm(l.buy_date, res.as_of) ? "lt" : "st";
+        key = l.isin + "|" + bucket;
+      }
       let g = groups.get(key);
       if (!g) {
-        g = { isin: l.isin, symbol: l.symbol, name: l.name, date: l.buy_date, qty: 0, value: 0, lot_ids: [], kinds: [] };
+        g = { isin: l.isin, symbol: l.symbol, name: l.name, bucket, date: l.buy_date, first_date: l.buy_date,
+          qty: 0, value: 0, lot_ids: [], kinds: [] };
         groups.set(key, g);
       }
       const unit = includeCharges ? l.cost_per_share : l.price;
       g.qty += l.qty_remaining;
       g.value += l.qty_remaining * unit;
+      g.date = Math.max(g.date, l.buy_date);
+      g.first_date = Math.min(g.first_date, l.buy_date);
       g.lot_ids.push(l.lot_id);
       if (l.kind !== "BUY" && !g.kinds.includes(l.kind)) g.kinds.push(l.kind);
     }
-    const out = [...groups.values()].sort((a, b) => cmp(a.symbol, b.symbol) || cmp(a.isin, b.isin) || (a.date - b.date));
+    const out = [...groups.values()].sort((a, b) =>
+      cmp(a.symbol, b.symbol) || cmp(a.isin, b.isin) || (a.date - b.date) || cmp(a.lot_ids[0], b.lot_ids[0]));
     for (const g of out) g.price = g.value / g.qty;
     return out;
   }
