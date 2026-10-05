@@ -19,7 +19,7 @@ Chrome/Edge, it can open `.csv` files directly via "Open with").
 | File | Required | Where to get it | Columns used |
 |---|---|---|---|
 | Transactions CSV | yes | ICICI Direct › Portfolio › Equity › All Transactions › download CSV | `Stock Symbol, Company Name, ISIN Code, Action, Quantity, Transaction Price, Transaction Date` (DD-Mon-YYYY); `Brokerage, Transaction Charges, StampDuty, Remarks` if present |
-| Holdings CSV | no, for reconciliation | Make it from ICICI Direct's equity portfolio (holdings) page; the app has a blank template | `ISIN Code, Qty, Value At Cost, Realized Profit / Loss` |
+| Holdings CSV | no, for reconciliation | ICICI Direct › Portfolio › Equity (holdings) › download CSV (or fill the app's blank template) | `ISIN Code, Qty, Value At Cost, Realized Profit / Loss`; other columns ignored |
 
 3. Set the **As of** date (defaults to today) and read the tabs: Overview, Summary, Lot Ledger, Open Lots,
    Sell Matches, Flags. Every table sorts, filters and downloads as CSV.

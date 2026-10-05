@@ -22,7 +22,7 @@
       Transactions CSV <input type="file" data-kind="txn" accept=".csv,text/csv">
     </label>
     <span class="file-name" data-name="txn">required</span>
-    <label class="file-btn" title="Optional. CSV with ISIN Code, Qty, Value At Cost, Realized Profit / Loss">
+    <label class="file-btn" title="Optional. ICICI Direct › Portfolio › Equity holdings CSV">
       Holdings CSV <input type="file" data-kind="hold" accept=".csv,text/csv">
     </label>
     <span class="file-name" data-name="hold">optional</span>
@@ -75,9 +75,9 @@
           <span class="status" data-status="hold">Not loaded</span>
         </div>
         <p>Lets the app check its results against ICICI's own figures: quantity, value at cost and realised P&amp;L per stock.
-          Make it from ICICI Direct's <b>Portfolio › Equity</b> holdings page, one row per stock, with exactly these columns:</p>
-        <p><code>ISIN Code</code>, <code>Qty</code>, <code>Value At Cost</code>, <code>Realized Profit / Loss</code>
-          <span class="hint">(numbers may contain commas; losses as -123 or (123))</span></p>
+          In ICICI Direct, go to <b>Portfolio › Equity</b> (your holdings) and download it as CSV.</p>
+        <p>It needs the columns <code>ISIN Code</code>, <code>Qty</code>, <code>Value At Cost</code> and <code>Realized Profit / Loss</code>;
+          any other columns are ignored. <span class="hint">No download option? Copy those four columns into the blank template.</span></p>
         <div class="row-btns">
           <label class="file-btn">Choose holdings CSV <input type="file" data-kind="hold" accept=".csv,text/csv"></label>
           <button class="btn" type="button" id="templateBtn">Download blank template</button>

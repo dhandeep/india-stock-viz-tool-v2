@@ -1,6 +1,6 @@
 // Offline cache for the app shell. User CSVs are never fetched or cached: they are read with FileReader.
 // Bump VERSION when the list of files changes.
-const VERSION = "lotfifo-v1";
+const VERSION = "lotfifo-v2";
 const FILES = [
   "./", "index.html", "style.css", "lotfifo.js", "app.js", "sample/sample_data.js",
   "manifest.webmanifest", "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png",

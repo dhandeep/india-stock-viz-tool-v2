@@ -121,3 +121,23 @@ def test_js_long_term_boundary(tmp_path, buy, sell, expected):
     b, s = date(*buy).strftime("%d-%b-%Y"), date(*sell).strftime("%d-%b-%Y")
     p.write_text(HEADER + f"A,A,INE1,Buy,1,10,0,0,0,R,S,x,{b},NSE,\nA,A,INE1,Sell,1,12,0,0,0,R,S,x,{s},NSE,\n")
     assert run_js(str(p))["matches"][0]["term"] == expected
+
+
+def test_reconcile_reads_icici_holdings_export_layout(tmp_path):
+    """ICICI's own holdings download: Stock Symbol first, extra columns, losses in brackets, trailing comma."""
+    txns = random_book(random.Random(11), n_isin=3, n_ev=30)
+    p, h = str(tmp_path / "t.csv"), str(tmp_path / "h.csv")
+    write_txns(p, txns)
+    py = F.run_fifo(F.parse_icici_csv(p), as_of=AS_OF)
+    with open(h, "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["Stock Symbol", "Company Name", "ISIN Code", "Qty", "Average Cost Price", "Current Market Price",
+                    "% Change over prev close", "Value At Cost", "Value At Market Price", "Realized Profit / Loss",
+                    "Unrealized Profit/Loss", "Unrealized Profit/Loss %", ""])
+        for s in F.summarize(py):
+            rp = s["realized_pnl"]
+            w.writerow([s["symbol"], "X LTD", s["isin"], s["qty_open"], "1.00", "2.00", "- 0.78", f"{s['cost_open']:.2f}",
+                        "0", f"({abs(rp):.2f})" if rp < 0 else f"{rp:.2f}", "0", "(1.00)", ""])
+    rec = F.reconcile(py, h)
+    assert rec and all(r["qty_ok"] and abs(r["realized_diff"]) < 0.01 and abs(r["cost_diff"]) < 0.01 for r in rec)
+    assert rec == run_js(p, holdings=h)["reconcile"]

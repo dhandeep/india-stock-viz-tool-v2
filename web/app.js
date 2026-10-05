@@ -61,6 +61,16 @@
   }
   const looksLikeHoldings = text => /^﻿?[^\n]*ISIN Code/.test(text) && /Value At Cost/.test(text.split(/\r?\n/, 1)[0]);
 
+  /** Holdings rows as {isin, symbol}, found by column name: ICICI's own export has Stock Symbol first. */
+  function holdingsEntries(text) {
+    const rows = F.parseCSV(text);
+    const head = (rows[0] || []).map(h => h.trim());
+    const iIsin = head.indexOf("ISIN Code"), iSym = head.indexOf("Stock Symbol");
+    if (iIsin < 0) return [];
+    return rows.slice(1).map(r => ({ isin: (r[iIsin] || "").trim(), symbol: iSym < 0 ? "" : (r[iSym] || "").trim() }))
+      .filter(e => e.isin);
+  }
+
   const looksLikeTxns = text => /Transaction Date/.test(text.split(/\r?\n/, 1)[0]);
   const fileErr = { txn: null, hold: null };
 
@@ -112,7 +122,7 @@
     else set("txn", "", "Not loaded");
     const holdMsg = fileErr.hold || holdErr;
     if (holdMsg) set("hold", "err", "✗ " + holdMsg);
-    else if (S.holdText != null && S.rec) set("hold", "ok", `✓ ${S.holdName}: ${F.parseCSV(S.holdText).slice(1).filter(r => (r[0] || "").trim()).length} rows`);
+    else if (S.holdText != null && S.rec) set("hold", "ok", `✓ ${S.holdName}: ${holdingsEntries(S.holdText).length} stocks`);
     else if (S.holdText != null) set("hold", "", `${S.holdName} loaded; checked once the transactions file loads`);
     else set("hold", "", "Not loaded (optional)");
     document.querySelectorAll('[data-name="txn"]').forEach(e => { e.textContent = S.txnName || "required"; });
@@ -139,8 +149,8 @@
             S.rec = F.reconcile(S.res, S.holdText);
             S.recBy = new Map(S.rec.map(r => [r.isin, r]));
             const known = new Set(S.summ.map(s => s.isin));
-            S.extraHoldings = F.parseCSV(S.holdText).slice(1).map(r => (r[0] || "").trim())
-              .filter(i => i && i !== "ISIN Code" && !known.has(i));
+            S.extraHoldings = holdingsEntries(S.holdText).filter(e => !known.has(e.isin))
+              .map(e => (e.symbol ? `${e.symbol} (${e.isin})` : e.isin));
           } catch (e) {
             holdErr = e.message;
             msgs.push({ type: "error", html: `<b>Holdings file could not be read:</b> ${esc(e.message)}` });
